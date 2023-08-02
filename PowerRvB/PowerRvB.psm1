@@ -7,10 +7,7 @@ function Invoke-WebClone {
         [Parameter(Mandatory)]
         [int] $FirstPodNumber,
         [Boolean] $CompetitionSetup=$True,
-        [Boolean] $CreateUsers,
         [String] $Domain='sdc.cpp',
-        [String] $Role,
-        [Boolean] $CreateRouters,
         [String] $WanPortGroup='0010_DefaultNetwork',
         [String] $Username,
         [String] $Password
@@ -26,19 +23,24 @@ function Invoke-WebClone {
 
     New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
 
-    $VAppName = -join ($PortGroup, '_Pod')
+    $VAppName = -join ($PortGroup[0], '_Pod')
     $VApp = New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag | Out-Null
     Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag | Out-Null
+
+    # Creating the Roles Assignments on vSphere
+    New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+
+    New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
     $VMsToClone = Get-ResourcePool -Name $SourceResourcePool | Get-VM
 
     Set-Snapshots -VMsToClone $VMsToClone
 
-    $Tasks = Create-NewVMs -VMsToClone $VMsToClone -VApp $VApp -CreatedPortGroups $PortGroup
+    $Tasks = Create-NewVMs -VMsToClone $VMsToClone -VApp $VAppName -CreatedPortGroups $PortGroup
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
-    Configure-VMs -AssignPortGroups $AssignPortGroups -VApp $VApp -WanPortGroup $WanPortGroup -CreatedPortGroups $PortGroup
+    Configure-VMs -AssignPortGroups $AssignPortGroups -VApp $VAppName -WanPortGroup $WanPortGroup -CreatedPortGroups $PortGroup
 
     Snapshot-NewVMs -VApp $VApp
 
@@ -58,7 +60,7 @@ function Configure-VMs {
         [Parameter(Mandatory)]
         [Boolean] $AssignPortGroups,
         [Parameter(Mandatory)]
-        [VApp] $VApp,
+        [String] $VApp,
         [Parameter(Mandatory)]
         [String] $WanPortGroup,
         [Parameter(Mandatory)]
@@ -67,8 +69,8 @@ function Configure-VMs {
 
     if ($AssignPortGroups) {
         #Set Variables
-        $Routers = Get-VApp -Name $VApp.Name -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
-        $VMs = Get-VApp -Name $VApp.Name -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
+        $Routers = Get-VApp -Name $VApp -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
+        $VMs = Get-VApp -Name $VApp -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
                     
         #Set VM Port Groups
         if ($VMs) {
@@ -89,13 +91,13 @@ function Configure-VMs {
                 Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false | Out-Null
             }
 
-            $tasks = Get-VApp -Name $VApp.Name | Get-VM -Name *PodRouter | Start-VM -RunAsync
+            $tasks = Get-VApp -Name $VApp | Get-VM -Name *PodRouter | Start-VM -RunAsync
 
             Wait-Task -Task $tasks -ErrorAction Stop
 
             Start-Sleep 30
 
-            Get-VApp -Name $VApp.Name | 
+            Get-VApp -Name $VApp | 
                 Get-VM -Name *PodRouter |
                     Select -ExpandProperty name | 
                         ForEach-Object { 
@@ -110,13 +112,13 @@ function Create-NewVMs {
         [Parameter(Mandatory)]
         [VM[]] $VMsToClone,
         [Parameter(Mandatory)]
-        [VApp] $VApp,
+        [String] $VAppName,
         [Parameter(Mandatory)]
         [String] $CreatedPortGroups
     )
 
     $Tasks = foreach ($VM in $VMsToClone) {
-        $VM | New-VM -Name ( -join (($_.Name.Split("P")[0]), $VM.Name)) -ResourcePool $VApp.Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
+        $VM | New-VM -Name ( -join (($_.Name.Split("P")[0]), $VM.Name)) -ResourcePool $VAppName -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
     }
 
     return $Tasks
@@ -230,38 +232,21 @@ function New-PodRouter {
         [Parameter(Mandatory = $true)]
         [String] $Target,
         [Parameter(Mandatory = $true)]
-        [String] $WanPortGroup,
-        [String] $LanPortGroup,
-        [Parameter(Mandatory = $true)]
-        [String] $PFSenseTemplate,
-        [Parameter(Mandatory = $false)]
-        [Boolean] $IsDevPod = $false
+        [String] $PFSenseTemplate
 
     )
 
     # Creating the Router
-    if (!$IsDevPod) {
-        $name = $Target + "_PodRouter"
-        New-VM -Name $name `
-            -ResourcePool $Target `
-            -Datastore Ursula `
-            -Template (Get-Template -Name $PFSenseTemplate) -RunAsync | Out-Null
-    } else {
-        $name = ( -join ($LanPortGroup.Substring(0, 4), '_DevPodRouter'))
-        New-VM -Name $name `
-            -ResourcePool $Target `
-            -Datastore Ursula `
-            -Template (Get-Template -Name $PFSenseTemplate) -RunAsync | Out-Null
-    }
+    $name = $Target + "_PodRouter"
+    New-VM -Name $name `
+        -ResourcePool $Target `
+        -Datastore Ursula `
+        -Template (Get-Template -Name $PFSenseTemplate) -RunAsync | Out-Null
 } 
 
 function New-PodUsers {
 
     param(
-        [Parameter(Mandatory = $true)]
-        [String] $Pod,
-        [Parameter(Mandatory = $true)]
-        [String] $Role,
         [Parameter(Mandatory = $true)]
         [String] $Description,
         [Parameter(Mandatory = $true)]
@@ -279,9 +264,6 @@ function New-PodUsers {
     Write-Host 'Creating user' $Name
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Name, '@', $Domain)) | Out-Null
     Add-ADGroupMember -Identity 'RvB Competitors' -Members $Name
-
-    # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name $Role -ErrorAction Stop) -Entity (Get-VApp -Name $Pod) -Principal ($Domain.Split(".")[0] + '\' + $Name) | Out-Null
     
     #Append User to CSV
     $out = "$Name,$Password"
