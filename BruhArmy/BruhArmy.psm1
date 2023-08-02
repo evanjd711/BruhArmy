@@ -13,7 +13,7 @@ function Invoke-WebClone {
         [String] $Password
     )
 
-    $Tag = $SourceResourcePool + "_Lab"
+    $Tag = $SourceResourcePool.ToLower() + "_lab"
     $RandomTag = Generate-Tag
 
     Set-Tag $Tag
@@ -258,7 +258,6 @@ function New-PodUsers {
     Import-Module ActiveDirectory
     $file = ( -join ("$env:USERPROFILE\Desktop\", $Description , "Users.txt"))
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
-    Write-Host 'Creating user' $Name
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain)) | Out-Null
     Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
     
