@@ -21,14 +21,14 @@ function Invoke-WebClone {
 
     $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -RandomTag $RandomTag -AssignPortGroups $true
 
-    New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
+    #New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
 
     $VAppName = -join ($PortGroup[0], '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
     Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag
 
     # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    #New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
@@ -37,7 +37,7 @@ function Invoke-WebClone {
     Set-Snapshots -VMsToClone $VMsToClone
 
     $Tasks = foreach ($VM in $VMsToClone) {
-        New-VM -VM $VM -Name ( -join (($PortGroup[0]), "_" + $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync | Out-Null
+        New-VM -VM $VM -Name ( -join (($PortGroup[0]), "_" + $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
     }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
@@ -92,7 +92,7 @@ function Configure-VMs {
 
         Wait-Task -Task $tasks -ErrorAction Stop | Out-Null
 
-        $credpath = $env:USERPROFILE + "pfsense_cred.xml"
+        $credpath = $env:USERPROFILE + "\pfsense_cred.xml"
 
         Get-VApp -Name $Target | 
             Get-VM -Name *PodRouter |
@@ -259,7 +259,7 @@ function New-PodUsers {
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     Write-Host 'Creating user' $Name
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Name, '@', $Domain)) | Out-Null
-    Add-ADGroupMember -Identity 'RvB Competitors' -Members $Name
+    Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
     
     #Append User to CSV
     $out = "$Name,$Password"
