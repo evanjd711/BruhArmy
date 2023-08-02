@@ -21,14 +21,14 @@ function Invoke-WebClone {
 
     $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -RandomTag $RandomTag -AssignPortGroups $true
 
-    New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
+    #New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
 
     $VAppName = -join ($PortGroup[0], '_Pod')
-    $VApp = New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag | Out-Null
-    Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag | Out-Null
+    New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
+    Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag
 
     # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    #New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
@@ -36,90 +36,84 @@ function Invoke-WebClone {
 
     Set-Snapshots -VMsToClone $VMsToClone
 
-    $Tasks = Create-NewVMs -VMsToClone $VMsToClone -VApp $VAppName -CreatedPortGroups $PortGroup
+    $Tasks = foreach ($VM in $VMsToClone) {
+        New-VM -VM $VM -Name ( -join (($PortGroup[0]), "_" + $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
+    }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
-    Configure-VMs -AssignPortGroups $AssignPortGroups -VApp $VAppName -WanPortGroup $WanPortGroup -CreatedPortGroups $PortGroup
+    Configure-VMs -Target $VAppName -WanPortGroup $WanPortGroup
 
-    Snapshot-NewVMs -VApp $VApp
+    Snapshot-NewVMs -Target $VAppName
 
 }
 
 function Snapshot-NewVMs {
     param(
         [Parameter(Mandatory)]
-        [VApp] $VApp
+        [String] $Target
     )
 
-    Get-VApp -Name $VApp.Name | Get-VM | ForEach-Object { New-Snapshot -VM $_ -Name 'Base' -Confirm:$false -RunAsync }
+    Get-VApp -Name $Target | Get-VM | ForEach-Object { New-Snapshot -VM $_ -Name 'Base' -Confirm:$false -RunAsync }
 }
 
 function Configure-VMs {
     param(
         [Parameter(Mandatory)]
-        [Boolean] $AssignPortGroups,
+        [String] $Target,
         [Parameter(Mandatory)]
-        [String] $VApp,
-        [Parameter(Mandatory)]
-        [String] $WanPortGroup,
-        [Parameter(Mandatory)]
-        [String] $CreatedPortGroups
+        [String] $WanPortGroup
     )
-
-    if ($AssignPortGroups) {
-        #Set Variables
-        $Routers = Get-VApp -Name $VApp -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
-        $VMs = Get-VApp -Name $VApp -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
-                    
-        #Set VM Port Groups
-        if ($VMs) {
-            $VMs | 
-                ForEach-Object { 
-                    Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
-                        Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false -RunAsync | Out-Null 
-                }
-        }
-        #Configure Routers
-        $Routers | 
-            ForEach-Object {
-
-            #Set Port Groups
-            Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
-                Set-NetworkAdapter -Portgroup (Get-VDPortgroup -Name $WanPortGroup) -Confirm:$false | Out-Null 
-            Get-NetworkAdapter -VM $_ -Name "Network adapter 2" -ErrorAction Stop | 
-                Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false | Out-Null
+    Write-Host $Target
+    #Set Variables
+    $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
+    $VMs = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
+                
+    #Set VM Port Groups
+    if ($VMs) {
+        $VMs | 
+            ForEach-Object { 
+                Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
+                    Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false -RunAsync
             }
-
-            $tasks = Get-VApp -Name $VApp | Get-VM -Name *PodRouter | Start-VM -RunAsync
-
-            Wait-Task -Task $tasks -ErrorAction Stop
-
-            Start-Sleep 30
-
-            Get-VApp -Name $VApp | 
-                Get-VM -Name *PodRouter |
-                    Select -ExpandProperty name | 
-                        ForEach-Object { 
-                            $oct = $_.split("_")[0].substring(2)
-                            Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential $cred -ScriptType Bash -RunAsync
-                        }
     }
+    #Configure Routers
+    $Routers | 
+        ForEach-Object {
+
+        #Set Port Groups
+        Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
+            Set-NetworkAdapter -Portgroup (Get-VDPortgroup -Name $WanPortGroup) -Confirm:$false
+        Get-NetworkAdapter -VM $_ -Name "Network adapter 2" -ErrorAction Stop | 
+            Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false
+        }
+
+        $tasks = Get-VApp -Name $Target | Get-VM -Name *PodRouter | Start-VM -RunAsync
+
+        Wait-Task -Task $tasks -ErrorAction Stop
+
+        Start-Sleep 60
+
+        Get-VApp -Name $Target | 
+            Get-VM -Name *PodRouter |
+                Select -ExpandProperty name | 
+                    ForEach-Object { 
+                        $oct = $_.split("_")[0].substring(2)
+                        Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential $cred -ScriptType Bash -RunAsync
+                    }
 }
 
 function Create-NewVMs {
     param(
         [Parameter(Mandatory)]
-        [VM[]] $VMsToClone,
+        [String[]] $VMsToClone,
         [Parameter(Mandatory)]
-        [String] $VAppName,
+        [String] $Target,
         [Parameter(Mandatory)]
-        [String] $CreatedPortGroups
+        [String] $PortGroup
     )
 
-    $Tasks = foreach ($VM in $VMsToClone) {
-        $VM | New-VM -Name ( -join (($_.Name.Split("P")[0]), $VM.Name)) -ResourcePool $VAppName -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
-    }
+    
 
     return $Tasks
 }
@@ -127,7 +121,7 @@ function Create-NewVMs {
 function Set-Snapshots {
     param(
         [Parameter(Mandatory)]
-        [VM[]] $VMsToClone
+        [String[]] $VMsToClone
     )
 
     $VMsToClone | ForEach-Object {
@@ -238,10 +232,12 @@ function New-PodRouter {
 
     # Creating the Router
     $name = $Target + "_PodRouter"
-    New-VM -Name $name `
+    $task = New-VM -Name $name `
         -ResourcePool $Target `
         -Datastore Ursula `
-        -Template (Get-Template -Name $PFSenseTemplate) -RunAsync | Out-Null
+        -Template (Get-Template -Name $PFSenseTemplate) -RunAsync
+
+    Wait-Task -Task $task
 } 
 
 function New-PodUsers {
