@@ -99,6 +99,7 @@ function Configure-VMs {
                 Select -ExpandProperty name | 
                     ForEach-Object { 
                         $oct = $_.split("_")[0].substring(2)
+                        $oct -replace '^0+', ''
                         Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync | Out-Null
                     }
 }
@@ -258,7 +259,7 @@ function New-PodUsers {
     $file = ( -join ("$env:USERPROFILE\Desktop\", $Description , "Users.txt"))
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     Write-Host 'Creating user' $Name
-    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Name, '@', $Domain)) | Out-Null
+    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain)) | Out-Null
     Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
     
     #Append User to CSV
