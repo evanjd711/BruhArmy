@@ -21,14 +21,14 @@ function Invoke-WebClone {
 
     $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -RandomTag $RandomTag -AssignPortGroups $true
 
-    #New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
+    New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
 
     $VAppName = -join ($PortGroup[0], '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
     Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag
 
     # Creating the Roles Assignments on vSphere
-    #New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
