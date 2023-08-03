@@ -170,10 +170,10 @@ function New-PodPortGroups {
         [ValidateRange(1, 100)]
         [Parameter(Mandatory = $true)]
         [int] $Portgroups,
-        [ValidateRange(1000, 2000)]
+        [ValidateRange(1000, 4000)]
         [Parameter(Mandatory = $true)]
         [int] $StartPort,
-        [ValidateRange(1000, 2000)]
+        [ValidateRange(1000, 4000)]
         [Parameter(Mandatory = $true)]
         [int] $EndPort,
         [String] $Tag,
