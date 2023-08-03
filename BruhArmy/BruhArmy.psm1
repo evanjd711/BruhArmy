@@ -14,18 +14,15 @@ function Invoke-WebClone {
     )
 
     $Tag = $SourceResourcePool.ToLower() + "_lab"
-    $RandomTag = Generate-Tag
 
     Set-Tag $Tag
-    Set-Tag $RandomTag
 
-    $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -RandomTag $RandomTag -AssignPortGroups $true
+    $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -AssignPortGroups $true
 
-    New-PodUsers -Username $Username -Password $Password -Description "$Tag $RandomTag" -Domain $Domain
+    New-PodUsers -Username $Username -Password $Password -Description "$Tag" -Domain $Domain
 
     $VAppName = -join ($PortGroup[0], '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
-    Get-VApp -Name $VAppName | New-TagAssignment -Tag $RandomTag
 
     # Creating the Roles Assignments on vSphere
     New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
@@ -113,9 +110,6 @@ function Create-NewVMs {
         [Parameter(Mandatory)]
         [String] $PortGroup
     )
-
-    
-
     return $Tasks
 }
 
@@ -131,21 +125,6 @@ function Set-Snapshots {
         }
         New-Snapshot -VM $_ -Name SnapshotForCloning
     }
-}
-
-function Generate-Tag {
-    $TokenSet = @{
-        U = [Char[]]'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        L = [Char[]]'abcdefghijklmnopqrstuvwxyz'
-    }
-
-    $Upper = Get-Random -Count 10 -InputObject $TokenSet.U
-    $Lower = Get-Random -Count 10 -InputObject $TokenSet.L
-
-    $StringSet = $Upper + $Lower
-
-    return (Get-Random -Count 20 -InputObject $StringSet) -join ''
-    
 }
 
 function Set-Tag {
@@ -209,7 +188,6 @@ function New-PodPortGroups {
                 New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($j, '_PodNetwork')) -VlanId $j | Out-Null
                 if ($Tag) {
                     Get-VDPortGroup -Name ( -join ($j, '_PodNetwork')) | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
-                    Get-VDPortGroup -Name ( -join ($j, '_PodNetwork')) | New-TagAssignment -Tag (Get-Tag -Name $RandomTag) | Out-Null
                 }
             }
             $j
@@ -256,14 +234,9 @@ function New-PodUsers {
 
     # Creating the User Accounts
     Import-Module ActiveDirectory
-    $file = ( -join ("$env:USERPROFILE\Desktop\", $Description , "Users.txt"))
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain)) | Out-Null
     Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
-    
-    #Append User to CSV
-    $out = "$Name,$Password"
-    $out | Out-File $file -Append -Force
 
 }
 
