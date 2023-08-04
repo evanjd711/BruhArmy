@@ -5,7 +5,7 @@ function Invoke-WebClone {
         [Parameter(Mandatory)]
         [String] $Target,
         [Parameter(Mandatory)]
-        [int] $FirstPodNumber,
+        [int] $PortGroup,
         [Boolean] $CompetitionSetup=$True,
         [String] $Domain='sdc.cpp',
         [String] $WanPortGroup='0010_DefaultNetwork',
@@ -17,11 +17,11 @@ function Invoke-WebClone {
 
     Set-Tag $Tag
 
-    $PortGroup = New-PodPortGroups -Portgroups 1 -StartPort $FirstPodNumber -EndPort ($FirstPodNumber + 100) -Tag $Tag -AssignPortGroups $true
+    New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($j, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
     New-PodUsers -Username $Username -Password $Password -Description "$Tag" -Domain $Domain
 
-    $VAppName = -join ($PortGroup[0], '_Pod')
+    $VAppName = -join ($PortGroup, '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
@@ -134,68 +134,11 @@ function Set-Tag {
     )
 
     try {
-        Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
+        Get-Tag -Name $Tag -ErrorAction Continue | Out-Null
     }
     catch {
-        New-TagCategory -Name $Tag -Description $tag -EntityType VApp, DistributedPortGroup, VM | Out-Null
-        New-Tag -Name $Tag -Category (Get-TagCategory -Name $Tag) | Out-Null
+        New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
     }
-}
-
-#Create Port Groups
-function New-PodPortGroups {
-
-    param(
-        [ValidateRange(1, 100)]
-        [Parameter(Mandatory = $true)]
-        [int] $Portgroups,
-        [ValidateRange(1000, 4000)]
-        [Parameter(Mandatory = $true)]
-        [int] $StartPort,
-        [ValidateRange(1000, 4000)]
-        [Parameter(Mandatory = $true)]
-        [int] $EndPort,
-        [String] $Tag,
-        [String] $RandomTag,
-        [Boolean] $AssignPortGroups
-
-    )
-
-    $ErrorActionPreference = "Stop"
-
-    # Gets the list of existing port groups in the range
-    $PortGroupList = Get-VDPortgroup -VDSwitch Main_DSW | Select-Object -ExpandProperty name | Sort-Object
-    $PortGroupList = $PortGroupList | 
-    ForEach-Object {
-        [int]$PortGroupList[$PortGroupList.indexOf($_)].Substring(0, $PortGroupList[$PortGroupList.indexOf($_)].indexOf('_'))
-    }
-    $PortGroupList = $PortGroupList.where{ $_ -IN $StartPort..$EndPort }
-    # Check if Port Groups can be created
-    if ($EndPort - $StartPort - $PortGroupList.Count + 1 -lt $Portgroups) {
-        $temp = $EndPort - $StartPort - $PortGroupList.Count + 1
-        Write-Error -Message "There are not enough port groups available in this range. Only $temp can be created."
-    }
-
-    # Creates the port groups
-    $j = $StartPort
-    $i = 0
-    While ($i -le $Portgroups - 1) {
-        if ($PortGroupList.IndexOf($j) -ne -1) { $j++; continue }
-        if ($j -gt $EndPort) { Write-Error -Message "There are no more available port groups in the specified range." }
-        else {
-            if ($AssignPortGroups) {
-                Write-Host "Creating Port Group $j..."
-                New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($j, '_PodNetwork')) -VlanId $j | Out-Null
-                if ($Tag) {
-                    Get-VDPortGroup -Name ( -join ($j, '_PodNetwork')) | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
-                }
-            }
-            $j
-            $j++
-            $i++
-        }
-    }
-    return $CreatedPortGroups
 }
 
 # Creates a pfSense Router for the vApp 
@@ -210,13 +153,16 @@ function New-PodRouter {
     )
 
     # Creating the Router
-    $name = $Target + "_PodRouter"
-    $task = New-VM -Name $name `
-        -ResourcePool $Target `
-        -Datastore Ursula `
-        -Template (Get-Template -Name $PFSenseTemplate) -RunAsync
+    if (!(Get-ResourcePool -Name $Target | Get-VM -Name *PodRouter)) {
+        $name = $Target + "_PodRouter"
+        $task = New-VM -Name $name `
+            -ResourcePool $Target `
+            -Datastore Ursula `
+            -Template (Get-Template -Name $PFSenseTemplate) -RunAsync
+        Wait-Task -Task $task | Out-Null
+    }
 
-    Wait-Task -Task $task
+    
 } 
 
 function New-PodUsers {
