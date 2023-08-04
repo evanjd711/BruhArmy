@@ -19,7 +19,7 @@ function Invoke-WebClone {
 
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($j, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
-    New-PodUsers -Username $Username -Password $Password -Description "$Tag" -Domain $Domain
+    New-PodUsers -Username $Username -Password $Password -Description $Tag -Domain $Domain
 
     $VAppName = -join ($PortGroup, '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
@@ -181,7 +181,7 @@ function New-PodUsers {
     # Creating the User Accounts
     Import-Module ActiveDirectory
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
-    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain)) | Out-Null
+    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain))
     Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
 
 }
