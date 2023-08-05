@@ -13,9 +13,14 @@ function Invoke-WebClone {
         [String] $Password
     )
 
-    $Tag = $SourceResourcePool.ToLower() + "_lab"
+    $Tag = $SourceResourcePool.ToLower() + "_lab_$Username"
 
-    Set-Tag $Tag
+    try {
+        Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
+    }
+    catch {
+        New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
+    }
 
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
@@ -75,6 +80,7 @@ function Configure-VMs {
             }
     }
     #Configure Routers
+    if ($Routers) {
     $Routers | 
         ForEach-Object {
 
@@ -99,18 +105,7 @@ function Configure-VMs {
                         $oct -replace '^0+', ''
                         Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync | Out-Null
                     }
-}
-
-function Create-NewVMs {
-    param(
-        [Parameter(Mandatory)]
-        [String[]] $VMsToClone,
-        [Parameter(Mandatory)]
-        [String] $Target,
-        [Parameter(Mandatory)]
-        [String] $PortGroup
-    )
-    return $Tasks
+    }
 }
 
 function Set-Snapshots {
@@ -124,20 +119,6 @@ function Set-Snapshots {
             return
         }
         New-Snapshot -VM $_ -Name SnapshotForCloning
-    }
-}
-
-function Set-Tag {
-    param(
-        [Parameter(Mandatory)]
-        [String] $Tag
-    )
-
-    try {
-        Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
-    }
-    catch {
-        New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
     }
 }
 
