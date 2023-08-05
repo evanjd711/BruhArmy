@@ -152,13 +152,13 @@ function New-PodUser {
         [Parameter(Mandatory = $true)]
         [String] $Username,
         [Parameter(Mandatory = $true)]
-        [String] $Password,
-        [String] $Domain='sdc.cpp'
+        [String] $Password
     )
 
+    $Domain='sdc.cpp'
     # Creating the User Accounts
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
-    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description :"Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain))
-
+    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description "Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain))
+    Add-AdGroupMember -Identity 'Kamino Users' -Members $Username
 }
 
