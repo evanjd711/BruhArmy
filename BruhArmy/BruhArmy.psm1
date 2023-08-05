@@ -24,7 +24,7 @@ function Invoke-WebClone {
 
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
-    New-PodUsers -Username $Username -Password $Password -Description $Tag -Domain $Domain
+    #New-PodUsers -Username $Username -Password $Password -Description $Tag -Domain $Domain
 
     $VAppName = -join ($PortGroup, '_Pod')
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
