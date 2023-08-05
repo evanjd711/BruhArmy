@@ -17,7 +17,7 @@ function Invoke-WebClone {
 
     Set-Tag $Tag
 
-    New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($j, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
+    New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
     New-PodUsers -Username $Username -Password $Password -Description $Tag -Domain $Domain
 
@@ -134,7 +134,7 @@ function Set-Tag {
     )
 
     try {
-        Get-Tag -Name $Tag -ErrorAction Continue | Out-Null
+        Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
     }
     catch {
         New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
