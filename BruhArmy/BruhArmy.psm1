@@ -163,7 +163,7 @@ function New-PodUsers {
     Import-Module ActiveDirectory
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain))
-    Add-ADGroupMember -Identity 'RvB Competitors' -Members $Username
+    Add-ADGroupMember -Identity 'Kamino Users' -Members $Username
 
 }
 
