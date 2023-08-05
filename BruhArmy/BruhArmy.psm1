@@ -146,7 +146,7 @@ function New-PodRouter {
     
 } 
 
-function New-PodUsers {
+function New-PodUser {
 
     param(
         [Parameter(Mandatory = $true)]
@@ -160,10 +160,8 @@ function New-PodUsers {
     )
 
     # Creating the User Accounts
-    Import-Module ActiveDirectory
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description $Description -UserPrincipalName (-join ($Username, '@', $Domain))
-    Add-ADGroupMember -Identity 'Kamino Users' -Members $Username
 
 }
 
