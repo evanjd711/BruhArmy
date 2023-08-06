@@ -13,7 +13,7 @@ function Invoke-WebClone {
     )
 
     # Creating the Tag
-    $Tag = $PortGroup + "_" + $SourceResourcePool.ToLower() + "_lab_$Username"
+    $Tag = -join ($PortGroup, "_", $SourceResourcePool.ToLower(), "_lab_$Username")
 
     try {
         Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
@@ -28,7 +28,7 @@ function Invoke-WebClone {
     New-VApp -Name $Tag -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $Tag) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
     # Creating the Router
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
@@ -39,19 +39,19 @@ function Invoke-WebClone {
     Set-Snapshots -VMsToClone $VMsToClone
 
     $Tasks = foreach ($VM in $VMsToClone) {
-        New-VM -VM $VM -Name ( -join ($PortGroup, "_", $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
+        New-VM -VM $VM -Name ( -join ($PortGroup, "_", $VM.name)) -ResourcePool (Get-VApp -Name $Tag).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
     }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
     # Configuring the VMs
-    Configure-VMs -Target $VAppName -WanPortGroup $WanPortGroup
+    Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
 
-    $task = Snapshot-NewVMs -Target $VAppName
+    $task = Snapshot-NewVMs -Target $Tag
     Wait-Task -Task $task
 
     # Revert to Base snapshot to fix drive inconsistency
-    Get-VApp -Name $VAppName | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'} 
+    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'} 
 }
 
 function Snapshot-NewVMs {
@@ -171,7 +171,7 @@ function Invoke-OrderSixtySix {
         [String] $Username,
         [String] $Tag
     )
-    
+
     if (!$Tag) {
         if ($Username) {
             #$Tag = "*lab_$Username"
