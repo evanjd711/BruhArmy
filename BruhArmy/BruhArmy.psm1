@@ -9,12 +9,11 @@ function Invoke-WebClone {
         [Boolean] $CompetitionSetup=$True,
         [String] $Domain='sdc.cpp',
         [String] $WanPortGroup='0010_DefaultNetwork',
-        [String] $Username,
-        [String] $Password
+        [String] $Username
     )
 
     # Creating the Tag
-    $Tag = $SourceResourcePool.ToLower() + "_lab_$Username"
+    $Tag = $PortGroup + "_" + $SourceResourcePool.ToLower() + "_lab_$Username"
 
     try {
         Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
@@ -26,8 +25,7 @@ function Invoke-WebClone {
     # Creating the Port Group
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
-    $VAppName = -join ($PortGroup, "_$Tag")
-    New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
+    New-VApp -Name $Tag -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
     New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
@@ -171,12 +169,12 @@ function New-PodUser {
 function Invoke-OrderSixtySix {
     param (
         [String] $Username,
-        [String] $Target
+        [String] $Tag
     )
 
-    if (!$Target) {
+    if (!$Tag) {
         if ($Username) {
-            $Tag = "*lab_$Username"
+            #$Tag = "*lab_$Username"
             $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync -ErrorAction Ignore
             Wait-Task -Task $task -ErrorAction Ignore
             $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
@@ -185,8 +183,8 @@ function Invoke-OrderSixtySix {
         }
     }   
 
-    if ($Target) {
-        $Tag = -join ($Target, "_lab_$Username")
+    if ($Tag) {
+        #$Tag = -join ($Target, "_lab_$Username")
         $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync
         Wait-Task -Task $task -ErrorAction Ignore
         $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
