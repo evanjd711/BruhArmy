@@ -30,7 +30,7 @@ function Invoke-WebClone {
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name '01_RvBCompetitors' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
@@ -160,5 +160,34 @@ function New-PodUser {
     $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
     New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description "Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain))
     Add-AdGroupMember -Identity 'Kamino Users' -Members $Username
+}
+
+function Invoke-OrderSixtySix {
+    param (
+        [String] $Username,
+        [String] $Target
+    )
+
+    if (!$Target) {
+        if ($Username) {
+            $Tag = "*lab_$Username"
+            $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync -ErrorAction Ignore
+            Wait-Task -Task $task -ErrorAction Ignore
+            $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
+            Wait-Task -Task $task
+            Get-VDPortgroup -Name $Tag | Remove-VDPortgroup -Confirm:$false
+        }
+    }   
+
+    if ($Target) {
+        $Tag = -join ($Target, "_lab_$Username")
+        $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync
+        Wait-Task -Task $task -ErrorAction Ignore
+        $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
+        Wait-Task -Task $task -ErrorAction Ignore
+        $task = Get-VDPortgroup -Name $Tag | Remove-VDPortgroup -Confirm:$false
+        Wait-Task -Task $task -ErrorAction Ignore
+        Get-Tag -Name $Tag | Remove-Tag -Confirm:$false
+    }
 }
 
