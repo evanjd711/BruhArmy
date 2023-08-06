@@ -13,6 +13,7 @@ function Invoke-WebClone {
         [String] $Password
     )
 
+    # Creating the Tag
     $Tag = $SourceResourcePool.ToLower() + "_lab_$Username"
 
     try {
@@ -22,32 +23,37 @@ function Invoke-WebClone {
         New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
     }
 
+    # Creating the Port Group
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
-    #New-PodUsers -Username $Username -Password $Password -Description $Tag -Domain $Domain
-
-    $VAppName = -join ($PortGroup, '_Pod')
+    $VAppName = -join ($PortGroup, "_$Tag")
     New-VApp -Name $VAppName -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
     New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $VAppName) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
 
+    # Creating the Router
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
+    # Cloning the VMs
     $VMsToClone = Get-ResourcePool -Name $SourceResourcePool | Get-VM
 
     Set-Snapshots -VMsToClone $VMsToClone
 
     $Tasks = foreach ($VM in $VMsToClone) {
-        New-VM -VM $VM -Name ( -join (($PortGroup[0]), "_" + $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
+        New-VM -VM $VM -Name ( -join ($PortGroup, "_", $VM.name)) -ResourcePool (Get-VApp -Name $VAppName).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
     }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
+    # Configuring the VMs
     Configure-VMs -Target $VAppName -WanPortGroup $WanPortGroup
 
-    Snapshot-NewVMs -Target $VAppName
+    $task = Snapshot-NewVMs -Target $VAppName
+    Wait-Task -Task $task
 
+    # Revert to Base snapshot to fix drive inconsistency
+    Get-VApp -Name $VAppName | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'} 
 }
 
 function Snapshot-NewVMs {
@@ -99,11 +105,11 @@ function Configure-VMs {
 
         Get-VApp -Name $Target | 
             Get-VM -Name *PodRouter |
-                Select -ExpandProperty name | 
+                Select-Object -ExpandProperty name | 
                     ForEach-Object { 
                         $oct = $_.split("_")[0].substring(2)
                         $oct -replace '^0+', ''
-                        Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync | Out-Null
+                        Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 100 -RunAsync | Out-Null
                     }
     }
 }
