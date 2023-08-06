@@ -185,7 +185,7 @@ function Invoke-OrderSixtySix {
         Wait-Task -Task $task -ErrorAction Ignore
         $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
         Wait-Task -Task $task -ErrorAction Ignore
-        $task = Get-VDPortgroup -Name $Tag | Remove-VDPortgroup -Confirm:$false
+        $task = Get-VDPortgroup -Tag $Tag | Remove-VDPortgroup -Confirm:$false
         Wait-Task -Task $task -ErrorAction Ignore
         Get-Tag -Name $Tag | Remove-Tag -Confirm:$false
     }
