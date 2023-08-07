@@ -112,7 +112,7 @@ function Configure-VMs {
                 Select-Object -ExpandProperty name | 
                     ForEach-Object { 
                         $oct = $_.split("_")[0].substring(2)
-                        $oct -replace '^0+', ''
+                        $oct = $oct -replace '^0+', ''
                         Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 100 -RunAsync | Out-Null
                     }
     }
