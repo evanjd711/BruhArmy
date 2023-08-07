@@ -44,6 +44,12 @@ function Invoke-WebClone {
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
+    $hidden = $VMsToClone | Get-TagAssignment -Tag hidden | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
+
+    $hidden | ForEach-Object {
+        New-VIPermission -Role (Get-VIRole -Name 'No Access' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    }
+
     # Configuring the VMs
     Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
 
