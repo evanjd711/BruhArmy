@@ -47,7 +47,7 @@ function Invoke-WebClone {
     $hidden = $VMsToClone | Get-TagAssignment -Tag 'hidden' | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
 
     $hidden | ForEach-Object {
-        New-VIPermission -Role (Get-VIRole -Name 'NoAccess' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+        New-VIPermission -Role (Get-VIRole -Name 'NoAccess' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, '_', $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
     }
 
     # Configuring the VMs
@@ -57,7 +57,7 @@ function Invoke-WebClone {
     Wait-Task -Task $task
 
     # Revert to Base snapshot to fix drive inconsistency
-    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'} 
+    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'}  -Confirm:$false
 }
 
 function Snapshot-NewVMs {
