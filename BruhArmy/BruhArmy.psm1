@@ -53,11 +53,10 @@ function Invoke-WebClone {
     # Configuring the VMs
     Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
 
-    $task = Snapshot-NewVMs -Target $Tag
-    Wait-Task -Task $task
+    Snapshot-NewVMs -Target $Tag
 
     # Revert to Base snapshot to fix drive inconsistency
-    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base'}  -Confirm:$false
+    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base' -Confirm:$false}
 }
 
 function Snapshot-NewVMs {
@@ -66,7 +65,8 @@ function Snapshot-NewVMs {
         [String] $Target
     )
 
-    Get-VApp -Name $Target | Get-VM | ForEach-Object { New-Snapshot -VM $_ -Name 'Base' -Confirm:$false -RunAsync }
+    $task = Get-VApp -Name $Target | Get-VM | ForEach-Object { New-Snapshot -VM $_ -Name 'Base' -Confirm:$false -RunAsync }
+    Wait-Task -task $task
 }
 
 function Configure-VMs {
