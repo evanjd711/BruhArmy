@@ -25,7 +25,7 @@ function Invoke-WebClone {
     # Creating the Port Group
     New-VDPortgroup -VDSwitch Main_DSW -Name ( -join ($PortGroup, '_PodNetwork')) -VlanId $PortGroup | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
-    New-VApp -Name $Tag -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -ErrorAction Stop | New-TagAssignment -Tag $Tag
+    New-VApp -Name $Tag -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -InventoryLocation (Get-Inventory -Name "07-Kamino") -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Roles Assignments on vSphere
     New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $Tag) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
@@ -39,7 +39,7 @@ function Invoke-WebClone {
     Set-Snapshots -VMsToClone $VMsToClone
 
     $Tasks = foreach ($VM in $VMsToClone) {
-        New-VM -VM $VM -Name ( -join ($PortGroup, "_", $VM.name)) -ResourcePool (Get-VApp -Name $Tag).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync
+        New-VM -VM $VM -Name ( -join ($PortGroup, "_", $VM.name)) -ResourcePool (Get-VApp -Name $Tag).Name -LinkedClone -ReferenceSnapshot "SnapshotForCloning" -RunAsync -Location (Get-Inventory -Name "07-Kamino")
     }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
