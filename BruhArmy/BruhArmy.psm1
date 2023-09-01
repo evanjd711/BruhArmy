@@ -105,7 +105,7 @@ function Configure-VMs {
 
         Wait-Task -Task $tasks -ErrorAction Stop | Out-Null
 
-        $credpath = $env:USERPROFILE + "\pfsense_cred.xml"
+        $credpath = $env:ProgramFiles + "\Kamino\lib\creds\pfsense_cred.xml"
 
         Get-VApp -Name $Target | 
             Get-VM -Name *PodRouter |
