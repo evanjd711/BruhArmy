@@ -27,9 +27,7 @@ function Invoke-WebClone {
 
     New-VApp -Name $Tag -Location (Get-ResourcePool -Name $Target -ErrorAction Stop) -InventoryLocation (Get-Inventory -Name "07-Kamino") -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
-    # Creating the Roles Assignments on vSphere
-    New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $Tag) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
-
+    
     # Creating the Router
     New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
 
@@ -49,6 +47,8 @@ function Invoke-WebClone {
         $hidden | ForEach-Object {
             New-VIPermission -Role (Get-VIRole -Name 'NoAccess' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, '_', $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
         }
+        # Creating the Roles Assignments on vSphere
+        New-VIPermission -Role (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop) -Entity (Get-VApp -Name $Tag) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
     }
 
     # Configuring the VMs
