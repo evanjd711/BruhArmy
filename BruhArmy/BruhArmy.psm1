@@ -44,19 +44,17 @@ function Invoke-WebClone {
 
     Wait-Task -Task $Tasks -ErrorAction Stop
 
-    $hidden = $VMsToClone | Get-TagAssignment -Tag 'hidden' | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
-
-    $hidden | ForEach-Object {
-        New-VIPermission -Role (Get-VIRole -Name 'NoAccess' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, '_', $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+    if ((Get-ADUser -Identity $Username -Properties MemberOf | Select-Object -ExpandProperty MemberOf) -cnotcontains "CN=SDC Admins,CN=Users,DC=sdc,DC=cpp") {
+        $hidden = $VMsToClone | Get-TagAssignment -Tag 'hidden' | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
+        $hidden | ForEach-Object {
+            New-VIPermission -Role (Get-VIRole -Name 'NoAccess' -ErrorAction Stop) -Entity (Get-VM -Name (-join ($PortGroup, '_', $_))) -Principal ($Domain.Split(".")[0] + '\' + $Username) | Out-Null
+        }
     }
 
     # Configuring the VMs
     Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
 
     Snapshot-NewVMs -Target $Tag
-
-    # Revert to Base snapshot to fix drive inconsistency
-    Get-VApp -Name $Tag | Get-VM | ForEach-Object {Set-VM -VM $_ -Snapshot 'Base' -Confirm:$false}
 }
 
 function Snapshot-NewVMs {
@@ -113,7 +111,8 @@ function Configure-VMs {
                     ForEach-Object { 
                         $oct = $_.split("_")[0].substring(2)
                         $oct = $oct -replace '^0+', ''
-                        Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 100 -RunAsync | Out-Null
+                        $task = Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync
+                        Wait-Task -Task $task
                     }
     }
 }
