@@ -43,12 +43,13 @@ function Invoke-WebClone {
     
     # Creating the Router
     $IsNatted = $false;
+    $Tasks
     try {
         Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop | Out-Null
         $IsNatted = $true;
-        New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
+        $Tasks = New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
     } catch {
-        New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
+        $Tasks = New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
     }
 
     # Cloning the VMs
@@ -56,7 +57,7 @@ function Invoke-WebClone {
 
     Set-Snapshots -VMsToClone $VMsToClone
 
-    $Tasks = foreach ($VM in $VMsToClone) {
+    $Tasks += foreach ($VM in $VMsToClone) {
         $VMOptions = @{
             VM = $VM;
             Name = (-join ($PortGroup, "_", $VM.name));
@@ -194,7 +195,7 @@ function New-PodRouter {
     } 
 
     $task = New-VM @VMParameters -RunAsync
-    Wait-Task -Task $task | Out-Null    
+    return $task  
 } 
 
 function New-PodUser {
@@ -300,16 +301,17 @@ function Invoke-CustomPod {
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Router
+    $Tasks
     if ($Natted) {
-        New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
+        $Tasks = New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
     } else {
-        New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
+        $Tasks = New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
     }
 
     # Cloning the VMs
-    $Tasks = foreach ($VM in $VMsToClone) {
+    $Tasks += foreach ($VM in $VMsToClone) {
         $VMOptions = @{
-            Name = (-join ($PortGroup, $VM.Substring(0, $VM.Length - 6)));
+            Name = (-join ($PortGroup, '_', $VM.Substring(0, $VM.Length - 6)));
             Template = (Get-Template -Name $VM);
             Datastore = 'Ursula';
             DiskStorageFormat = 'Thin';
