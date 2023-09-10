@@ -301,9 +301,9 @@ function Invoke-CustomPod {
 
     # Creating the Router
     if ($Natted) {
-        New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
+        New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
     } else {
-        New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
+        New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
     }
 
     # Cloning the VMs
@@ -313,7 +313,7 @@ function Invoke-CustomPod {
             Template = (Get-Template -Name $VM);
             Datastore = 'Ursula';
             DiskStorageFormat = 'Thin';
-            ResourcePool = $Target;
+            ResourcePool = $Tag;
             Location = (Get-Inventory -Name "07-Kamino")
         }
         New-VM @VMOptions -RunAsync
