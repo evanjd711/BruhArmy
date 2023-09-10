@@ -309,7 +309,7 @@ function Invoke-CustomPod {
     # Cloning the VMs
     $Tasks = foreach ($VM in $VMsToClone) {
         $VMOptions = @{
-            Name = (-join ($PortGroup, $template.name.Substring(0, $template.name.Length - 6)));
+            Name = (-join ($PortGroup, $VM.Substring(0, $VM.Length - 6)));
             Template = (Get-Template -Name $VM);
             Datastore = 'Ursula';
             DiskStorageFormat = 'Thin';
