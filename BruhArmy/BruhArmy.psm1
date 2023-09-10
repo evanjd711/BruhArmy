@@ -49,9 +49,9 @@ function Invoke-WebClone {
 
     $Tasks = @()
     if (!(Get-ResourcePool -Name $SourceResourcePool | Get-VM -Name "*PodRouter")) {
-        try {
+        if ($IsNatted) {
             $Tasks += New-PodRouter -Target $SourceResourcePool -PFSenseTemplate '1:1NAT_PodRouter'
-        } catch {
+        } else {
             $Tasks += New-PodRouter -Target $SourceResourcePool -PFSenseTemplate 'pfSense blank'
         }
     }
