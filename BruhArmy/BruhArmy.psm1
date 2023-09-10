@@ -168,6 +168,7 @@ function New-PodUser {
     try { 
         Get-ADUser -Identity $Username
         Write-Error "Username $Username is not available."
+        exit 1
     }
     catch {
         $Domain='sdc.cpp'
