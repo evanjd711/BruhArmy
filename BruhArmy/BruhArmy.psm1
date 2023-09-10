@@ -42,12 +42,14 @@ function Invoke-WebClone {
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
     
     # Creating the Router
-    $IsNatted = $false;
+    $IsNatted = $false
+    if (!(Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop | Out-Null)) {
+        $IsNatted = $true
+    }
+
     $Tasks = @()
     if (!(Get-ResourcePool -Name $SourceResourcePool | Get-VM -Name "*PodRouter")) {
         try {
-            Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop | Out-Null
-            $IsNatted = $true;
             $Tasks += New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
         } catch {
             $Tasks += New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
