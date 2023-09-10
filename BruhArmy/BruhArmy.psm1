@@ -36,7 +36,6 @@ function Invoke-WebClone {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        ResourcePool = (Get-ResourcePool -Name $Target -ErrorAction Stop);
         InventoryLocation = (Get-Inventory -Name "07-Kamino");
     }
 
@@ -295,7 +294,6 @@ function Invoke-CustomPod {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        ResourcePool = (Get-ResourcePool -Name $Target -ErrorAction Stop);
         InventoryLocation = (Get-Inventory -Name "07-Kamino");
     }
 
@@ -311,7 +309,7 @@ function Invoke-CustomPod {
     # Cloning the VMs
     $Tasks = foreach ($VM in $VMsToClone) {
         $VMOptions = @{
-            Name = (-join ($Tag.split('_')[0], $template.name.Substring(0, $template.name.Length - 6)));
+            Name = (-join ($PortGroup, $template.name.Substring(0, $template.name.Length - 6)));
             Template = (Get-Template -Name $VM);
             Datastore = 'Ursula';
             DiskStorageFormat = 'Thin';
