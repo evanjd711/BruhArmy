@@ -331,7 +331,11 @@ function Invoke-CustomPod {
         New-VIPermission @PermissionOptions | Out-Null
     }
     
-    Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
-
+    if ($Natted) {
+        Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup -Nat
+    } else {
+        Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
+    }
+    
     Snapshot-NewVMs -Target $Tag
 }
