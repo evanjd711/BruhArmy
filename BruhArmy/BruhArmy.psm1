@@ -164,11 +164,19 @@ function New-PodUser {
         [String] $Password
     )
 
-    $Domain='sdc.cpp'
-    # Creating the User Accounts
-    $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
-    New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description "Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain)) -Path "OU=Kamino Users,DC=sdc,DC=cpp"
-    Add-AdGroupMember -Identity 'Kamino Users' -Members $Username
+    
+    try { 
+        Get-ADUser -Identity $Username
+        Write-Error "Username $Username is not available."
+    }
+    catch {
+        $Domain='sdc.cpp'
+        # Creating the User Accounts
+        $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
+        New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description "Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain)) -Path "OU=Kamino Users,DC=sdc,DC=cpp"
+        Add-AdGroupMember -Identity 'Kamino Users' -Members $Username
+    }
+    
 }
 
 function Invoke-OrderSixtySix {
