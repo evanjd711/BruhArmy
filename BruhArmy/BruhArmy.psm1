@@ -43,13 +43,13 @@ function Invoke-WebClone {
     
     # Creating the Router
     $IsNatted = $false;
-    $Tasks
+    $Tasks = @()
     try {
         Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop | Out-Null
         $IsNatted = $true;
-        $Tasks = New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
+        $Tasks += New-PodRouter -Target $Target -PFSenseTemplate '1:1NAT_PodRouter'
     } catch {
-        $Tasks = New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
+        $Tasks += New-PodRouter -Target $Target -PFSenseTemplate 'pfSense blank'
     }
 
     # Cloning the VMs
@@ -301,11 +301,11 @@ function Invoke-CustomPod {
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
     # Creating the Router
-    $Tasks
+    $Tasks = @()
     if ($Natted) {
-        $Tasks = New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
+        $Tasks += New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
     } else {
-        $Tasks = New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
+        $Tasks += New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
     }
 
     # Cloning the VMs
