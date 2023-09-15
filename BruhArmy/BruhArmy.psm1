@@ -43,7 +43,7 @@ function Invoke-WebClone {
     
     # Creating the Router
     $IsNatted = $false
-    if (Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop | Out-Null) {
+    if (Get-TagAssignment -Entity (Get-ResourcePool -Name $SourceResourcePool) -Tag 'natted' -ErrorAction stop) {
         $IsNatted = $true
     }
 
