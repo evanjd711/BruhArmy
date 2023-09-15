@@ -149,7 +149,7 @@ function Configure-VMs {
         }
 
         if ($Nat) {
-            $tasks = Get-VApp -Name $Target | Get-VM -Name *PodRouter | Start-VM -RunAsync
+            $tasks = Get-VApp -Name $Target | Get-VM -Name "1:1" | Start-VM -RunAsync
 
             Wait-Task -Task $tasks -ErrorAction Stop | Out-Null
 
@@ -193,10 +193,13 @@ function New-PodRouter {
 
     )
 
+    $nat = ""
+    if ($PFSenseTemplate -eq "1:1NAT_PodRouter") { $nat = "1:1" }
+
     $VMParameters = @{
         Datastore = 'Ursula';
         Template = (Get-Template -Name $PFSenseTemplate);
-        Name = $Target.Split("_")[0] + "_PodRouter";
+        Name = $Target.Split("_")[0] + "_${nat}_PodRouter";
         ResourcePool = $Target
     } 
 
