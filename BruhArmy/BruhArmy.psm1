@@ -304,14 +304,6 @@ function Invoke-CustomPod {
 
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
 
-    # Creating the Router
-    $Tasks = @()
-    if ($Natted) {
-        $Tasks += New-PodRouter -Target $Tag -PFSenseTemplate '1:1NAT_PodRouter'
-    } else {
-        $Tasks += New-PodRouter -Target $Tag -PFSenseTemplate 'pfSense blank'
-    }
-
     # Cloning the VMs
     $Tasks += foreach ($VM in $VMsToClone) {
         $VMOptions = @{
