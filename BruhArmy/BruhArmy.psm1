@@ -124,6 +124,7 @@ function Configure-VMs {
 
     #Set Variables
     $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
+    $Routers += Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*1:1*'
     $VMs = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
                 
     #Set VM Port Groups
@@ -136,6 +137,7 @@ function Configure-VMs {
     }
     #Configure Routers
     if ($Routers) {
+    
     $Routers | 
         ForEach-Object {
 
@@ -154,7 +156,7 @@ function Configure-VMs {
             $credpath = $env:ProgramFiles + "\Kamino\lib\creds\pfsense_cred.xml"
 
             Get-VApp -Name $Target | 
-                Get-VM -Name *PodRouter |
+                Get-VM -Name "*1:1*" |
                     Select-Object -ExpandProperty name | 
                         ForEach-Object { 
                             $oct = $_.split("_")[0].substring(2)
