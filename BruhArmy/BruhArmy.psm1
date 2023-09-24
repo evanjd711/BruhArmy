@@ -123,7 +123,7 @@ function Configure-VMs {
     )
 
     #Set Variables
-    $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*PodRouter*'
+    $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*pfSense*'
     $Routers += Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*1:1*'
     $VMs = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
                 
@@ -149,7 +149,7 @@ function Configure-VMs {
         }
 
         if ($Nat) {
-            $tasks = Get-VApp -Name $Target | Get-VM -Name "1:1" | Start-VM -RunAsync
+            $tasks = Get-VApp -Name $Target | Get-VM -Name "*1:1*" | Start-VM -RunAsync
 
             Wait-Task -Task $tasks -ErrorAction Stop | Out-Null
 
@@ -193,15 +193,21 @@ function New-PodRouter {
 
     )
 
-    $nat = ""
-    if ($PFSenseTemplate -eq "1:1NAT_PodRouter") { $nat = "1:1" }
-
-    $VMParameters = @{
-        Datastore = 'Ursula';
-        Template = (Get-Template -Name $PFSenseTemplate);
-        Name = $Target.Split("_")[0] + "_${nat}_PodRouter";
-        ResourcePool = $Target
-    } 
+    if ($PFSenseTemplate -eq "1:1NAT_PodRouter") { 
+        $VMParameters = @{
+            Datastore = 'Ursula';
+            Template = (Get-Template -Name $PFSenseTemplate);
+            Name = $Target.Split("_")[0] + "_1:1_PodRouter";
+            ResourcePool = $Target
+        } 
+    } else {
+        $VMParameters = @{
+            Datastore = 'Ursula';
+            Template = (Get-Template -Name $PFSenseTemplate);
+            Name = $Target.Split("_")[0] + "_pfSense_PodRouter";
+            ResourcePool = $Target
+        }
+    }
 
     $task = New-VM @VMParameters -RunAsync
     return $task  
