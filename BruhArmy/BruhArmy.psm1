@@ -246,24 +246,24 @@ function Invoke-OrderSixtySix {
 
     if (!$Tag) {
         if ($Username) {
-            #$Tag = "*lab_$Username"
-            $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync -ErrorAction Ignore
+            $Targets = "*lab_$Username"
+            $task = Get-VApp -Tag $Targets | Get-VM | Stop-VM -Confirm:$false -RunAsync -ErrorAction Ignore
             Wait-Task -Task $task -ErrorAction Ignore
-            $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
-            Wait-Task -Task $task
-            Get-VDPortgroup -Name $Tag | Remove-VDPortgroup -Confirm:$false
+            $task = Get-VApp -Tag $Targets | Remove-VApp -DeletePermanently -Confirm:$false
+            Wait-Task -Task $task -ErrorAction Ignore
+            Get-VDPortgroup -Name $Targets | Remove-VDPortgroup -Confirm:$false
         }
     }   
 
     if ($Tag) {
-        #$Tag = -join ($Target, "_lab_$Username")
-        $task = Get-VApp -Tag $Tag | Get-VM | Stop-VM -Confirm:$false -RunAsync
+        $Targets = -join ('*', $Tag, '*')
+        $task = Get-VApp -Tag $Targets | Get-VM | Stop-VM -Confirm:$false -RunAsync
         Wait-Task -Task $task -ErrorAction Ignore
-        $task = Get-VApp -Tag $Tag | Remove-VApp -DeletePermanently -Confirm:$false
+        $task = Get-VApp -Tag $Targets | Remove-VApp -DeletePermanently -Confirm:$false
         Wait-Task -Task $task -ErrorAction Ignore
-        $task = Get-VDPortgroup -Tag $Tag | Remove-VDPortgroup -Confirm:$false
+        $task = Get-VDPortgroup -Tag $Targets | Remove-VDPortgroup -Confirm:$false
         Wait-Task -Task $task -ErrorAction Ignore
-        Get-Tag -Name $Tag | Remove-Tag -Confirm:$false
+        Get-Tag -Name $Targets | Remove-Tag -Confirm:$false
     }
 }
 
