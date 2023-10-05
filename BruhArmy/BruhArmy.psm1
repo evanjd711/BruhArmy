@@ -101,6 +101,8 @@ function Invoke-WebClone {
         Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup
     }
     Snapshot-NewVMs -Target $Tag
+
+    Configure-StartOrder -tag $Tag
 }
 
 function Snapshot-NewVMs {
@@ -345,4 +347,23 @@ function Invoke-CustomPod {
     }
     
     Snapshot-NewVMs -Target $Tag
+
+    # Set VM Start Order
+    Configure-StartOrder -tag $Tag
+}
+
+function Configure-StartOrder {
+    param (
+        [Parameter(Mandatory)]
+        [String] $tag
+    )
+
+    # Set VM Start Order
+    $VApp = Get-VApp -Name $Tag
+    $spec = New-Object VMware.Vim.VAppConfigSpec
+    $spec.EntityConfig = $VApp.ExtensionData.VAppConfig.EntityConfig
+    $spec.EntityConfig | ForEach-Object {
+        $_.StartOrder = 1
+    }
+    $VApp.ExtensionData.UpdateVAppConfig($spec)
 }
