@@ -15,8 +15,8 @@ function Invoke-WebClone {
     )
 
     if (Get-TagAssignment -Entity (Get-ResourcePool $SourceResourcePool) -Tag koth-attacker -ErrorAction Stop) {
-        $IP = Invoke-KothClone -SourceResourcePool $SourceResourcePool -Domain $Domain -Username $Username
-        return $IP
+        $GuestInfo = Invoke-KothClone -SourceResourcePool $SourceResourcePool -Domain $Domain -Username $Username
+        return $GuestInfo.trim()
     }
 
     # Creating the Tag
@@ -171,7 +171,10 @@ function Invoke-KothClone {
         $IP = (Get-VM -Name (-join ($Username, "_", $VM.name))).guest.IPAddress[0]
         Start-Sleep 5
     }
-    return $IP
+
+    $OS = (Get-VM -Name (-join ($Username, "_", $VM.name))).Guest.OSFullName
+
+    return $IP + '_' + $OS
 }
 
 function Snapshot-NewVMs {
