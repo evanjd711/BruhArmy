@@ -14,6 +14,11 @@ function Invoke-WebClone {
         [String] $Username
     )
 
+    if (Get-TagAssignment -Entity (Get-ResourcePool $SourceResourcePool) -Tag koth-attacker -ErrorAction Stop) {
+        $IP = Invoke-KothClone -SourceResourcePool $SourceResourcePool -Domain $Domain -Username $Username
+        return $IP
+    }
+
     # Creating the Tag
     $Tag = -join ($PortGroup, "_", $SourceResourcePool.ToLower(), "_lab_$Username")
 
@@ -33,12 +38,12 @@ function Invoke-WebClone {
 
     New-VDPortgroup @PortGroupOptions | New-TagAssignment -Tag (Get-Tag -Name $Tag) | Out-Null
 
+    # Create the vApp
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
         InventoryLocation = (Get-Inventory -Name "07-Kamino");
     }
-
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
     
     # Creating the Router
@@ -103,6 +108,69 @@ function Invoke-WebClone {
     Snapshot-NewVMs -Target $Tag
 
     Configure-StartOrder -tag $Tag
+}
+
+function Invoke-KothClone {
+    param(
+        [Parameter(Mandatory)]
+        [String] $SourceResourcePool,
+        [Parameter(Mandatory=$false)]
+        [String] $Target="07-02_Pods",
+        [Parameter(Mandatory)]
+        [String] $Domain,
+        [Parameter(Mandatory=$false)]
+        [String] $WanPortGroup="0040_RvBCoreNetwork",
+        [Parameter(Mandatory)]
+        [String] $Username
+    )
+
+    # Creating the Tag
+    $Tag = -join ($Username, "_", $SourceResourcePool.ToLower(), "_lab_$Username")
+
+    try {
+        Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
+    }
+    catch {
+        New-Tag -Name $Tag -Category (Get-TagCategory -Name CloneOnDemand) | Out-Null
+    }
+
+    # Create the vApp
+    $VAppOptions = @{
+        Name = $Tag;
+        Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
+        InventoryLocation = (Get-Inventory -Name "07-Kamino");
+    }
+    New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag | Out-Null
+
+    # Cloning the VMs
+    $VMsToClone = Get-ResourcePool -Name $SourceResourcePool | Get-VM
+
+    Set-Snapshots -VMsToClone $VMsToClone | Out-Null
+ 
+    foreach ($VM in $VMsToClone) {
+        $VMOptions = @{
+            VM = $VM;
+            Name = (-join ($Username, "_", $VM.name));
+            ResourcePool = $Tag;
+            ReferenceSnapshot = "SnapshotForCloning";
+            Location = (Get-Inventory -Name "07-Kamino");
+        }
+        New-VM @VMOptions -LinkedClone | Out-Null
+    }
+    
+    # Configure VMs
+    Get-NetworkAdapter -VM (-join ($Username, "_", $VM.name)) -Name "Network adapter 1" -ErrorAction Stop | 
+        Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name $WanPortGroup) -Confirm:$false -RunAsync | Out-Null
+
+    Snapshot-NewVMs -Target $Tag | Out-Null
+
+    Get-VApp -Name $Tag | Get-VM | Start-VM -Confirm:$false | Out-Null
+
+    while (!$IP) {    
+        $IP = (Get-VM -Name (-join ($Username, "_", $VM.name))).guest.IPAddress[0]
+        Start-Sleep 5
+    }
+    return $IP
 }
 
 function Snapshot-NewVMs {
