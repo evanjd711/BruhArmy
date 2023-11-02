@@ -154,6 +154,7 @@ function Invoke-KothClone {
             ResourcePool = $Tag;
             ReferenceSnapshot = "SnapshotForCloning";
             Location = (Get-Inventory -Name "07-Kamino");
+            VMHost = (Get-VMHost -Name "rex.sdc.cpp")
         }
         New-VM @VMOptions -LinkedClone | Out-Null
     }
