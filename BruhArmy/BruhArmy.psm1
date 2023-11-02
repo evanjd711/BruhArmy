@@ -159,8 +159,10 @@ function Invoke-KothClone {
         New-VM @VMOptions -LinkedClone | Out-Null
     }
     
+    $VM = Get-VApp -Name $tag | Get-VM
+
     # Configure VMs
-    Get-NetworkAdapter -VM (-join ($Username, "_", $VM.name)) -Name "Network adapter 1" -ErrorAction Stop | 
+    Get-NetworkAdapter -VM $VM.name -Name "Network adapter 1" -ErrorAction Stop | 
         Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name $WanPortGroup) -Confirm:$false -RunAsync | Out-Null
 
     Snapshot-NewVMs -Target $Tag | Out-Null
@@ -168,11 +170,11 @@ function Invoke-KothClone {
     Get-VApp -Name $Tag | Get-VM | Start-VM -Confirm:$false | Out-Null
 
     while (!$IP) {    
-        $IP = (Get-VM -Name (-join ($Username, "_", $VM.name))).guest.IPAddress[0]
+        $IP = $VM.guest.IPAddress[0]
         Start-Sleep 5
     }
 
-    $OS = (Get-VM -Name (-join ($Username, "_", $VM.name))).Guest.OSFullName
+    $OS = $VM.Guest.OSFullName
 
     return $IP + '_' + $OS
 }
