@@ -125,7 +125,7 @@ function Invoke-KothClone {
     )
 
     # Creating the Tag
-    $Tag = -join ($Username, "_", $SourceResourcePool.ToLower(), "_lab_$Username")
+    $Tag = -join ($Username, "_", $SourceResourcePool.ToLower())
 
     try {
         Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
