@@ -197,8 +197,7 @@ function Configure-VMs {
     )
 
     #Set Variables
-    $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*pfSense*'
-    $Routers += Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*1:1*'
+    $Routers = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -Like '*Router*'
     $VMs = Get-VApp -Name $Target -ErrorAction Stop | Get-VM | Where-Object -Property Name -NotLike '*PodRouter*'
                 
     #Set VM Port Groups
