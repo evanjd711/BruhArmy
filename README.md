@@ -1,1 +1,1 @@
-# BruhArmy Powershell Module for Kamino
+# Powershell Module for Kamino
