@@ -115,11 +115,11 @@ function Invoke-KothClone {
         [Parameter(Mandatory)]
         [String] $SourceResourcePool,
         [Parameter(Mandatory=$false)]
-        [String] $Target="07-02_Pods",
+        [String] $Target="{07-02_Pods}",
         [Parameter(Mandatory)]
         [String] $Domain,
         [Parameter(Mandatory=$false)]
-        [String] $WanPortGroup="0040_RvBCoreNetwork",
+        [String] $WanPortGroup="{wanportgroup}",
         [Parameter(Mandatory)]
         [String] $Username
     )
@@ -138,7 +138,7 @@ function Invoke-KothClone {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        InventoryLocation = (Get-Inventory -Name "07-Kamino");
+        InventoryLocation = (Get-Inventory -Name "{vmfolder}");
     }
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag | Out-Null
 
@@ -153,8 +153,7 @@ function Invoke-KothClone {
             Name = (-join ($Username, "_", $VM.name));
             ResourcePool = $Tag;
             ReferenceSnapshot = "SnapshotForCloning";
-            Location = (Get-Inventory -Name "07-Kamino");
-            VMHost = (Get-VMHost -Name "rex.sdc.cpp")
+            Location = (Get-Inventory -Name "{vmfolder}");
         }
         New-VM @VMOptions -LinkedClone | Out-Null
     }
