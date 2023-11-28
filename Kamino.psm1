@@ -78,26 +78,23 @@ function Invoke-WebClone {
     }
 
     Wait-Task -Task $Tasks -ErrorAction Stop
-
-    if ((Get-ADUser -Identity $Username -Properties MemberOf | Select-Object -ExpandProperty MemberOf) -cnotcontains "CN=SDC Admins,CN=Users,DC=sdc,DC=cpp") {
-        #Hidding VMs
-        $hidden = $VMsToClone | Get-TagAssignment -Tag 'hidden' | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
-        $hidden | ForEach-Object {
-            $VMRoleOptions = @{
-                Role = (Get-VIRole -Name 'NoAccess' -ErrorAction Stop);
-                Entity = (Get-VM -Name (-join ($PortGroup, '_', $_)));
-                Principal = ($Domain.Split(".")[0] + '\' + $Username)
-            }
-            New-VIPermission @VMRoleOptions | Out-Null
+    #Hidding VMs
+    $hidden = $VMsToClone | Get-TagAssignment -Tag 'hidden' | Select-Object -ExpandProperty Entity | Select-Object -ExpandProperty Name
+    $hidden | ForEach-Object {
+        $VMRoleOptions = @{
+            Role = (Get-VIRole -Name 'NoAccess' -ErrorAction Stop);
+            Entity = (Get-VM -Name (-join ($PortGroup, '_', $_)));
+            Principal = ($Domain + '\' + $Username)
         }
-        # Creating the VApp Role Assignment
-        $VAppRoleOptions = @{
-            Role = (Get-VIRole -Name 'KaminoUsers' -ErrorAction Stop);
-            Entity = (Get-VApp -Name $Tag);
-            Principal = ($Domain.Split(".")[0] + '\' + $Username)
-        }
-        New-VIPermission @VAppRoleOptions | Out-Null
+        New-VIPermission @VMRoleOptions | Out-Null
     }
+    # Creating the VApp Role Assignment
+    $VAppRoleOptions = @{
+        Role = (Get-VIRole -Name 'KaminoUsers' -ErrorAction Stop);
+        Entity = (Get-VApp -Name $Tag);
+        Principal = ($Domain + '\' + $Username)
+    }
+    New-VIPermission @VAppRoleOptions | Out-Null
 
     # Configuring the VMs
     if ($IsNatted) {
@@ -375,14 +372,12 @@ function Invoke-CustomPod {
     }
     Wait-Task -Task $Tasks
 
-    if ((Get-ADUser -Identity $Username -Properties MemberOf | Select-Object -ExpandProperty MemberOf) -cnotcontains "CN=SDC Admins,CN=Users,DC=sdc,DC=cpp") {
-        $PermissionOptions = @{
-            Role = (Get-VIRole -Name 'KaminoUsersCustomPod');
-            Entity = (Get-VApp -Name $Tag);
-            Principal = ($Domain.Split(".")[0] + '\' + $Username)
-        }
-        New-VIPermission @PermissionOptions | Out-Null
+    $PermissionOptions = @{
+        Role = (Get-VIRole -Name 'KaminoUsersCustomPod');
+        Entity = (Get-VApp -Name $Tag);
+        Principal = ($Domain + '\' + $Username)
     }
+    New-VIPermission @PermissionOptions | Out-Null
     
     if ($Natted) {
         Configure-VMs -Target $Tag -WanPortGroup $WanPortGroup -Nat
