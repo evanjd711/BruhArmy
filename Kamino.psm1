@@ -31,8 +31,8 @@ function Invoke-WebClone {
 
     # Creating the Port Group
     $PortGroupOptions = @{
-        VDSwitch = 'Main_DSW';
-        Name = ( -join ($PortGroup, '_PodNetwork'));
+        VDSwitch = '{maindistributedswitch}';
+        Name = ( -join ($PortGroup, '_{portgroupsuffix}'));
         VlanId = $PortGroup;
     }
 
@@ -42,7 +42,7 @@ function Invoke-WebClone {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        InventoryLocation = (Get-Inventory -Name "07-Kamino");
+        InventoryLocation = (Get-Inventory -Name "{inventorylocation}");
     }
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
     
@@ -72,7 +72,7 @@ function Invoke-WebClone {
             Name = (-join ($PortGroup, "_", $VM.name));
             ResourcePool = $Tag;
             ReferenceSnapshot = "SnapshotForCloning";
-            Location = (Get-Inventory -Name "07-Kamino");
+            Location = (Get-Inventory -Name "{inventorylocation}");
         }
         New-VM @VMOptions -LinkedClone -RunAsync 
     }
@@ -92,7 +92,7 @@ function Invoke-WebClone {
         }
         # Creating the VApp Role Assignment
         $VAppRoleOptions = @{
-            Role = (Get-VIRole -Name '07_KaminoUsers' -ErrorAction Stop);
+            Role = (Get-VIRole -Name 'KaminoUsers' -ErrorAction Stop);
             Entity = (Get-VApp -Name $Tag);
             Principal = ($Domain.Split(".")[0] + '\' + $Username)
         }
@@ -115,7 +115,7 @@ function Invoke-KothClone {
         [Parameter(Mandatory)]
         [String] $SourceResourcePool,
         [Parameter(Mandatory=$false)]
-        [String] $Target="{07-02_Pods}",
+        [String] $Target="{targetresourcepool}",
         [Parameter(Mandatory)]
         [String] $Domain,
         [Parameter(Mandatory=$false)]
@@ -138,7 +138,7 @@ function Invoke-KothClone {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        InventoryLocation = (Get-Inventory -Name "{vmfolder}");
+        InventoryLocation = (Get-Inventory -Name "{inventorylocation}");
     }
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag | Out-Null
 
@@ -153,7 +153,7 @@ function Invoke-KothClone {
             Name = (-join ($Username, "_", $VM.name));
             ResourcePool = $Tag;
             ReferenceSnapshot = "SnapshotForCloning";
-            Location = (Get-Inventory -Name "{vmfolder}");
+            Location = (Get-Inventory -Name "{inventorylocation}");
         }
         New-VM @VMOptions -LinkedClone | Out-Null
     }
@@ -204,7 +204,7 @@ function Configure-VMs {
         $VMs | 
             ForEach-Object { 
                 Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
-                    Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false -RunAsync | Out-Null
+                    Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_{portgroupsuffix}'))) -Confirm:$false -RunAsync | Out-Null
             }
     }
     #Configure Routers
@@ -217,7 +217,7 @@ function Configure-VMs {
         Get-NetworkAdapter -VM $_ -Name "Network adapter 1" -ErrorAction Stop | 
             Set-NetworkAdapter -Portgroup (Get-VDPortgroup -Name $WanPortGroup) -Confirm:$false | Out-Null
         Get-NetworkAdapter -VM $_ -Name "Network adapter 2" -ErrorAction Stop | 
-            Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_PodNetwork'))) -Confirm:$false | Out-Null
+            Set-NetworkAdapter -Portgroup (Get-VDPortGroup -name ( -join ($_.Name.Split("_")[0], '_{portgroupsuffix}'))) -Confirm:$false | Out-Null
         }
 
         if ($Nat) {
@@ -225,7 +225,7 @@ function Configure-VMs {
 
             Wait-Task -Task $tasks -ErrorAction Stop | Out-Null
 
-            $credpath = $env:ProgramFiles + "\Kamino\lib\creds\pfsense_cred.xml"
+            $credpath = ".\lib\creds\pfsense_cred.xml"
 
             Get-VApp -Name $Target | 
                 Get-VM -Name "*1:1*" |
@@ -233,7 +233,7 @@ function Configure-VMs {
                         ForEach-Object { 
                             $oct = $_.split("_")[0].substring(2)
                             $oct = $oct -replace '^0+', ''
-                            Invoke-VMScript -VM $_ -ScriptText "sed 's/172.16.254/172.16.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync
+                            Invoke-VMScript -VM $_ -ScriptText "sed 's/{firsttwooctets}.254/{firsttwooctets}.$Oct/g' /cf/conf/config.xml > tempconf.xml; cp tempconf.xml /cf/conf/config.xml; rm /tmp/config.cache; /etc/rc.reload_all start" -GuestCredential (Import-CliXML -Path $credpath) -ScriptType Bash -ToolsWaitSecs 120 -RunAsync
                         }
         }
     }
@@ -266,14 +266,14 @@ function New-PodRouter {
 
     if ($PFSenseTemplate -eq "1:1NAT_PodRouter") { 
         $VMParameters = @{
-            Datastore = 'Ursula';
+            Datastore = '{datastore}';
             Template = (Get-Template -Name $PFSenseTemplate);
             Name = $Target.Split("_")[0] + "_1:1_PodRouter";
             ResourcePool = $Target
         } 
     } else {
         $VMParameters = @{
-            Datastore = 'Ursula';
+            Datastore = '{datastore}';
             Template = (Get-Template -Name $PFSenseTemplate);
             Name = $Target.Split("_")[0] + "_pfSense_PodRouter";
             ResourcePool = $Target
@@ -283,31 +283,6 @@ function New-PodRouter {
     $task = New-VM @VMParameters -RunAsync
     return $task  
 } 
-
-function New-PodUser {
-
-    param(
-        [Parameter(Mandatory = $true)]
-        [String] $Username,
-        [Parameter(Mandatory = $true)]
-        [String] $Password
-    )
-
-    
-    try { 
-        Get-ADUser -Identity $Username
-        Write-Error "Username $Username is not available."
-        exit 1
-    }
-    catch {
-        $Domain='sdc.cpp'
-        # Creating the User Accounts
-        $SecurePassword = ConvertTo-SecureString -AsPlainText $Password -Force
-        New-ADUser -Name $Username -ChangePasswordAtLogon $false -AccountPassword $SecurePassword -Enabled $true -Description "Registered Kamino User" -UserPrincipalName (-join ($Username, '@', $Domain)) -Path "OU=Kamino Users,DC=sdc,DC=cpp"
-        Add-AdGroupMember -Identity 'Kamino Users' -Members $Username
-    }
-    
-}
 
 function Invoke-OrderSixtySix {
     param (
@@ -371,8 +346,8 @@ function Invoke-CustomPod {
 
     # Creating the Port Group
     $PortGroupOptions = @{
-        VDSwitch = 'Main_DSW';
-        Name = ( -join ($PortGroup, '_PodNetwork'));
+        VDSwitch = '{maindistributedswitch}';
+        Name = ( -join ($PortGroup, '_{portgroupsuffix}'));
         VlanId = $PortGroup;
     }
 
@@ -381,7 +356,7 @@ function Invoke-CustomPod {
     $VAppOptions = @{
         Name = $Tag;
         Location = (Get-ResourcePool -Name $Target -ErrorAction Stop);
-        InventoryLocation = (Get-Inventory -Name "07-Kamino");
+        InventoryLocation = (Get-Inventory -Name "{inventorylocation}");
     }
 
     New-VApp @VAppOptions -ErrorAction Stop | New-TagAssignment -Tag $Tag
@@ -391,10 +366,10 @@ function Invoke-CustomPod {
         $VMOptions = @{
             Name = (-join ($PortGroup, '_', $VM.Substring(0, $VM.Length - 6)));
             Template = (Get-Template -Name $VM);
-            Datastore = 'Ursula';
+            Datastore = '{datastore}';
             DiskStorageFormat = 'Thin';
             ResourcePool = $Tag;
-            Location = (Get-Inventory -Name "07-Kamino")
+            Location = (Get-Inventory -Name "{inventorylocation}")
         }
         New-VM @VMOptions -RunAsync
     }
@@ -402,7 +377,7 @@ function Invoke-CustomPod {
 
     if ((Get-ADUser -Identity $Username -Properties MemberOf | Select-Object -ExpandProperty MemberOf) -cnotcontains "CN=SDC Admins,CN=Users,DC=sdc,DC=cpp") {
         $PermissionOptions = @{
-            Role = (Get-VIRole -Name '08_KaminoUsersCustomPod');
+            Role = (Get-VIRole -Name 'KaminoUsersCustomPod');
             Entity = (Get-VApp -Name $Tag);
             Principal = ($Domain.Split(".")[0] + '\' + $Username)
         }
