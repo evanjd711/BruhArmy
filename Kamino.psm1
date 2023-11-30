@@ -20,7 +20,7 @@ function Invoke-WebClone {
     }
 
     # Creating the Tag
-    $Tag = -join ($PortGroup, "_", $SourceResourcePool.ToLower(), "_lab_$Username")
+    $Tag = -join ($PortGroup, "_", $SourceResourcePool.ToLower(), "_$Username")
 
     try {
         Get-Tag -Name $Tag -ErrorAction Stop | Out-Null
